@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Drone Path Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        .telemetry-block {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .telemetry-block button {
+            margin-top: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .telemetry-block button:hover {
+            background: #c0392b;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 16px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #response {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Drone Path Predictor</h1>
+
+    <label>Drone ID:</label>
+    <input type="text" id="droneId" value="drone_01"/>
+
+    <label>Drone Type:</label>
+    <input type="text" id="droneType" value="quadrotor"/>
+
+    <h2>Telemetry Data</h2>
+
+    <div id="telemetry-container"></div>
+
+    <button onclick="addTelemetryPoint()">Add Telemetry Point</button>
+    <button onclick="sendData()">Calculate</button>
+
+    <h2>Server Response</h2>
+    <pre id="response">Waiting...</pre>
+</div>
+
+<script>
+    function addTelemetryPoint() {
+        const container = document.getElementById("telemetry-container");
+
+        const div = document.createElement("div");
+        div.className = "telemetry-block";
+
+        div.innerHTML = `
+            <label>Time (seconds):</label>
+            <input type="number" step="0.01" class="time" placeholder="0"/>
+
+            <label>Longitude:</label>
+            <input type="number" step="0.000001" class="longitude" placeholder="00.000000"/>
+
+            <label>Latitude:</label>
+            <input type="number" step="0.000001" class="latitude" placeholder="00.000000"/>
+
+            <label>Altitude:</label>
+            <input type="number" step="0.01" class="altitude" placeholder="100"/>
+
+            <button onclick="this.parentNode.remove()">🗑 Remove</button>
+        `;
+
+        container.appendChild(div);
+    }
+
+    function sendData() {
+        const droneId = document.getElementById("droneId").value.trim();
+        const droneType = document.getElementById("droneType").value.trim();
+
+        const telemetry = [];
+        const blocks = document.querySelectorAll(".telemetry-block");
+
+        blocks.forEach(block => {
+            const time = parseFloat(block.querySelector(".time").value);
+            const lon = parseFloat(block.querySelector(".longitude").value);
+            const lat = parseFloat(block.querySelector(".latitude").value);
+            const alt = parseFloat(block.querySelector(".altitude").value);
+
+            telemetry.push({
+                time: time,
+                position: [lon, lat],
+                altitude: alt
+            });
+        });
+
+        const payload = {
+            drone_id: droneId,
+            drone_type: droneType,
+            telemetry: telemetry
+        };
+
+        fetch("/api/drones/predict-path", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(err => {
+                document.getElementById("response").textContent = "Error: " + err;
+            });
+    }
+</script>
+
+</body>
+</html>
