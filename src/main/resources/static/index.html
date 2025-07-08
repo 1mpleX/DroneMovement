@@ -103,6 +103,7 @@
 
     <button onclick="addTelemetryPoint()">Add Telemetry Point</button>
     <button onclick="sendData()">Calculate</button>
+    <button onclick="detectDroneType()">Detect Drone Type</button>
 
     <h2>Server Response</h2>
     <pre id="response">Waiting...</pre>
@@ -161,6 +162,48 @@
         };
 
         fetch("/api/drones/predict-path", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(err => {
+                document.getElementById("response").textContent = "Error: " + err;
+            });
+    }
+
+    function detectDroneType() {
+        const droneId = document.getElementById("droneId").value.trim();
+        const droneType = document.getElementById("droneType").value.trim();
+
+        const telemetry = [];
+        const blocks = document.querySelectorAll(".telemetry-block");
+
+        blocks.forEach(block => {
+            const time = parseFloat(block.querySelector(".time").value);
+            const lon = parseFloat(block.querySelector(".longitude").value);
+            const lat = parseFloat(block.querySelector(".latitude").value);
+            const alt = parseFloat(block.querySelector(".altitude").value);
+
+            telemetry.push({
+                time: time,
+                position: [lon, lat],
+                altitude: alt
+            });
+        });
+
+        const payload = {
+            drone_id: droneId,
+            drone_type: droneType,
+            telemetry: telemetry
+        };
+
+        fetch("/api/drones/drone-type", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
