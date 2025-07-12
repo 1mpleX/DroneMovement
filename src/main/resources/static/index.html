@@ -85,140 +85,338 @@
             margin: 0 auto;
         }
     </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
-<body>
+    <body>
 
-<div class="container">
-    <h1>Drone Path Predictor</h1>
+    <div class="container">
+        <h1>Drone Path Predictor</h1>
 
-    <label>Drone ID:</label>
-    <input type="text" id="droneId" value="drone_01"/>
+        <label>Drone ID:</label>
+        <input type="text" id="droneId" value="drone_01"/>
 
-    <label>Drone Type:</label>
-    <input type="text" id="droneType" value="quadrotor"/>
+        <label>Drone Type:</label>
+        <input type="text" id="droneType" value="quadrotor"/>
 
-    <h2>Telemetry Data</h2>
+        <h2>Telemetry Data</h2>
 
-    <div id="telemetry-container"></div>
+        <div id="telemetry-container"></div>
 
-    <button onclick="addTelemetryPoint()">Add Telemetry Point</button>
-    <button onclick="sendData()">Calculate</button>
-    <button onclick="detectDroneType()">Detect Drone Type</button>
+        <button onclick="addTelemetryPoint()">Add Telemetry Point</button>
+        <button onclick="sendData()">Calculate Distance</button>
+        <button onclick="detectDroneType()">Detect Drone Type</button>
+        <button onclick="collectAndCreateGraph()">Create Graph</button>
 
-    <h2>Server Response</h2>
-    <pre id="response">Waiting...</pre>
-</div>
+        <h2>Server Response</h2>
+        <pre id="response">Waiting...</pre>
 
-<script>
-    function addTelemetryPoint() {
-        const container = document.getElementById("telemetry-container");
+        <h2>Deviation Graph</h2>
+        <canvas id="deviationChart" width="600" height="300"></canvas>
+    </div>
 
-        const div = document.createElement("div");
-        div.className = "telemetry-block";
+        <script>
 
-        div.innerHTML = `
-            <label>Time (seconds):</label>
-            <input type="number" step="0.01" class="time" placeholder="0"/>
+            window.predictedPath = [];
 
-            <label>Longitude:</label>
-            <input type="number" step="0.000001" class="longitude" placeholder="00.000000"/>
+            function addTelemetryPoint() {
+                const container = document.getElementById("telemetry-container");
 
-            <label>Latitude:</label>
-            <input type="number" step="0.000001" class="latitude" placeholder="00.000000"/>
+                const div = document.createElement("div");
+                div.className = "telemetry-block";
 
-            <label>Altitude:</label>
-            <input type="number" step="0.01" class="altitude" placeholder="100"/>
+                div.innerHTML = `
+                    <label>Time (seconds):</label>
+                    <input type="number" step="0.01" class="time" placeholder="0"/>
 
-            <button onclick="this.parentNode.remove()">🗑 Remove</button>
-        `;
+                    <label>Longitude:</label>
+                    <input type="number" step="0.000001" class="longitude" placeholder="00.000000"/>
 
-        container.appendChild(div);
-    }
+                    <label>Latitude:</label>
+                    <input type="number" step="0.000001" class="latitude" placeholder="00.000000"/>
 
-    function sendData() {
-        const droneId = document.getElementById("droneId").value.trim();
-        const droneType = document.getElementById("droneType").value.trim();
+                    <label>Altitude:</label>
+                    <input type="number" step="0.01" class="altitude" placeholder="100"/>
 
-        const telemetry = [];
-        const blocks = document.querySelectorAll(".telemetry-block");
+                    <button onclick="this.parentNode.remove()">🗑 Remove</button>
+                `;
 
-        blocks.forEach(block => {
-            const time = parseFloat(block.querySelector(".time").value);
-            const lon = parseFloat(block.querySelector(".longitude").value);
-            const lat = parseFloat(block.querySelector(".latitude").value);
-            const alt = parseFloat(block.querySelector(".altitude").value);
+                container.appendChild(div);
+            }
 
-            telemetry.push({
-                time: time,
-                position: [lon, lat],
-                altitude: alt
-            });
-        });
+            function sendData() {
+                const droneId = document.getElementById("droneId").value.trim();
+                const droneType = document.getElementById("droneType").value.trim();
 
-        const payload = {
-            drone_id: droneId,
-            drone_type: droneType,
-            telemetry: telemetry
-        };
+                const telemetry = [];
+                const blocks = document.querySelectorAll(".telemetry-block");
 
-        fetch("/api/drones/predict-path", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-        })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("response").textContent = JSON.stringify(data, null, 2);
-            })
-            .catch(err => {
-                document.getElementById("response").textContent = "Error: " + err;
-            });
-    }
+                blocks.forEach(block => {
+                    const time = parseFloat(block.querySelector(".time").value);
+                    const lon = parseFloat(block.querySelector(".longitude").value);
+                    const lat = parseFloat(block.querySelector(".latitude").value);
+                    const alt = parseFloat(block.querySelector(".altitude").value);
 
-    function detectDroneType() {
-        const droneId = document.getElementById("droneId").value.trim();
-        const droneType = document.getElementById("droneType").value.trim();
+                    telemetry.push({
+                        time: time,
+                        position: [lon, lat],
+                        altitude: alt
+                    });
+                });
 
-        const telemetry = [];
-        const blocks = document.querySelectorAll(".telemetry-block");
+                const payload = {
+                    drone_id: droneId,
+                    drone_type: droneType,
+                    telemetry: telemetry
+                };
 
-        blocks.forEach(block => {
-            const time = parseFloat(block.querySelector(".time").value);
-            const lon = parseFloat(block.querySelector(".longitude").value);
-            const lat = parseFloat(block.querySelector(".latitude").value);
-            const alt = parseFloat(block.querySelector(".altitude").value);
+                fetch("/api/drones/predict-path", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
 
-            telemetry.push({
-                time: time,
-                position: [lon, lat],
-                altitude: alt
-            });
-        });
+                        if (data.predictedPoints && data.predictedPoints.length > 0) {
+                            window.predictedPath = data.predictedPoints.map(p => ({
+                                time: p.secondsAhead,
+                                position: [p.longitude, p.latitude],
+                                altitude: p.altitude
+                            }));
 
-        const payload = {
-            drone_id: droneId,
-            drone_type: droneType,
-            telemetry: telemetry
-        };
+                            drawChart(window.predictedPath);
+                        } else {
+                            window.predictedPath = [];
+                            alert("No predicted points received.");
+                        }
+                    })
+                    .catch(err => {
+                        document.getElementById("response").textContent = "Error: " + err;
+                    });
+            }
 
-        fetch("/api/drones/drone-type", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-        })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("response").textContent = JSON.stringify(data, null, 2);
-            })
-            .catch(err => {
-                document.getElementById("response").textContent = "Error: " + err;
-            });
-    }
-</script>
 
-</body>
+            function detectDroneType() {
+                const droneId = document.getElementById("droneId").value.trim();
+                const droneType = document.getElementById("droneType").value.trim();
+
+                const telemetry = [];
+                const blocks = document.querySelectorAll(".telemetry-block");
+
+                blocks.forEach(block => {
+                    const time = parseFloat(block.querySelector(".time").value);
+                    const lon = parseFloat(block.querySelector(".longitude").value);
+                    const lat = parseFloat(block.querySelector(".latitude").value);
+                    const alt = parseFloat(block.querySelector(".altitude").value);
+
+                    telemetry.push({
+                        time: time,
+                        position: [lon, lat],
+                        altitude: alt
+                    });
+                });
+
+                const payload = {
+                    drone_id: droneId,
+                    drone_type: droneType,
+                    telemetry: telemetry
+                };
+
+                fetch("/api/drones/drone-type", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+                    })
+                    .catch(err => {
+                        document.getElementById("response").textContent = "Error: " + err;
+                    });
+            }
+
+            function collectAndCreateGraph() {
+                const telemetry = [];
+                const blocks = document.querySelectorAll(".telemetry-block");
+
+                blocks.forEach(block => {
+                    const time = parseFloat(block.querySelector(".time").value);
+                    const lon = parseFloat(block.querySelector(".longitude").value);
+                    const lat = parseFloat(block.querySelector(".latitude").value);
+                    const alt = parseFloat(block.querySelector(".altitude").value);
+
+                    if (!isNaN(time) && !isNaN(lon) && !isNaN(lat) && !isNaN(alt)) {
+                        telemetry.push({
+                            time: time,
+                            position: [lon, lat],
+                            altitude: alt
+                        });
+                    }
+                });
+
+                if (telemetry.length === 0) {
+                    alert("No telemetry data available. Add telemetry points first.");
+                    return;
+                }
+
+                if (!window.predictedPath || window.predictedPath.length === 0) {
+                    alert("No predicted path available. Run prediction first.");
+                    return;
+                }
+
+                plotGraph(telemetry);
+            }
+
+            function plotGraph(realTelemetry) {
+                const predicted = window.predictedPath;
+                if (!predicted || predicted.length === 0) {
+                    alert("No predicted path available. Run prediction first.");
+                    return;
+                }
+                if (!realTelemetry || realTelemetry.length === 0) {
+                    alert("No real telemetry data provided");
+                    return;
+                }
+
+                realTelemetry.sort((a, b) => a.time - b.time);
+                predicted.sort((a, b) => a.time - b.time);
+
+                const distances = [];
+                const altDeviations = [];
+                const times = [];
+
+                for (let i = 0; i < Math.min(predicted.length, realTelemetry.length); i++) {
+                    const pred = predicted[i];
+                    const real = realTelemetry[i];
+
+                    const dist = haversineDistance(
+                        pred.position[1], pred.position[0],
+                        real.position[1], real.position[0]
+                    );
+
+                    const altDev = Math.abs(real.altitude - pred.altitude);
+
+                    distances.push(dist);
+                    altDeviations.push(altDev);
+                    times.push(real.time);
+                }
+
+                const ctx = document.getElementById("deviationChart").getContext("2d");
+
+                if (window.myDeviationChart) {
+                    window.myDeviationChart.destroy();
+                }
+
+                window.myDeviationChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: times,
+                        datasets: [
+                            {
+                                label: 'Horizontal Deviation (m)',
+                                data: distances,
+                                borderColor: 'blue',
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Altitude Deviation (m)',
+                                data: altDeviations,
+                                borderColor: 'red',
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time (s)'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Deviation (meters)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function haversineDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371000;
+                const dLat = toRad(lat2 - lat1);
+                const dLon = toRad(lon2 - lon1);
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return R * c;
+            }
+
+            function toRad(deg) {
+                return deg * Math.PI / 180;
+            }
+            function drawChart(predictedPoints) {
+                const ctx = document.getElementById('deviationChart').getContext('2d');
+
+                if (window.myChart) {
+                    window.myChart.destroy();
+                }
+
+                const labels = predictedPoints.map(p => p.time);
+                const lonData = predictedPoints.map(p => p.position[0]);
+                const latData = predictedPoints.map(p => p.position[1]);
+                const altData = predictedPoints.map(p => p.altitude);
+
+                window.myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Longitude',
+                                data: lonData,
+                                borderColor: 'rgb(75, 192, 192)',
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Latitude',
+                                data: latData,
+                                borderColor: 'rgb(54, 162, 235)',
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Altitude',
+                                data: altData,
+                                borderColor: 'rgb(255, 99, 132)',
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: false
+                            }
+                        }
+                    }
+                });
+            }
+        </script>
+
+    </body>
 </html>
