@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 @RestController
 @RequestMapping("/api/drones")
@@ -47,11 +48,6 @@ public class DroneController {
             predictedPoints.add(
                     new PredictedPoint(t, predictedLon, predictedLat, predictedAlt)
             );
-
-//            System.out.printf(
-//                    "Через %d cекунд: lon=%.8f, lat=%.8f, alt=%.2f%n",
-//                    t, predictedLon, predictedLat, predictedAlt
-//            );
         }
 
         return new PredictionResponse(droneRequest.getDrone_id(), predictedPoints);
@@ -143,8 +139,6 @@ public class DroneController {
         } else {
             detectedType = "VTOL";
         }
-//        System.out.printf("Обнаружен тип дрона: %s (Угол: %.2f°, Ускорение: %.5f)%n",
-//                detectedType, Math.toDegrees(avgTurn), avgAccel);
 
         return new DetectedDroneType(droneRequest.getDrone_id(), detectedType);
     }
@@ -160,6 +154,7 @@ public class DroneController {
                     List.of()
             );
         }
+
         List<PredictedPoint> currentTrajectory = new ArrayList<>();
         for (DroneRequest.TelemetryPoint point : telemetry) {
             currentTrajectory.add(new PredictedPoint(
@@ -169,6 +164,7 @@ public class DroneController {
                     point.getAltitude()
             ));
         }
+
         DroneRequest.TelemetryPoint prev = telemetry.get(telemetry.size() - 2);
         DroneRequest.TelemetryPoint curr = telemetry.get(telemetry.size() - 1);
         double timeDiff = curr.getTime() - prev.getTime();
@@ -184,13 +180,18 @@ public class DroneController {
                     curr.getAltitude() + altSpeed * t
             ));
         }
+
         List<PredictedPoint> realContinuation = new ArrayList<>();
-        for (int t = 1; t <= 10; t++) {
+        Random rand = new Random();
+        for (int t = 1; t <= 15; t++) {
+            double noiseLon = (rand.nextDouble() - 0.5) * 0.0005;
+            double noiseLat = (rand.nextDouble() - 0.5) * 0.0005;
+            double noiseAlt = (rand.nextDouble() - 0.5) * 2.0;
             realContinuation.add(new PredictedPoint(
                     curr.getTime() + t,
-                    curr.getPosition().get(0) + lonSpeed * t * 1.01,
-                    curr.getPosition().get(1) + latSpeed * t * 0.99,
-                    curr.getAltitude() + altSpeed * t * 1.02
+                    curr.getPosition().get(0) + lonSpeed * t * 1.01 + noiseLon,
+                    curr.getPosition().get(1) + latSpeed * t * 0.99 + noiseLat,
+                    curr.getAltitude() + altSpeed * t * 1.02 + noiseAlt
             ));
         }
         return new TrajectoryVisualizationResponse(
