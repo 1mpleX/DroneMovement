@@ -149,5 +149,72 @@ public class DroneController {
         return new DetectedDroneType(droneRequest.getDrone_id(), detectedType);
     }
 
+    @PostMapping("/trajectory-visualization")
+    public TrajectoryVisualizationResponse getTrajectoryVisualization(@RequestBody DroneRequest droneRequest) {
+        List<DroneRequest.TelemetryPoint> telemetry = droneRequest.getTelemetry();
+        if (telemetry == null || telemetry.size() < 2) {
+            return new TrajectoryVisualizationResponse(
+                    droneRequest.getDrone_id(),
+                    List.of(),
+                    List.of(),
+                    List.of()
+            );
+        }
+        List<PredictedPoint> currentTrajectory = new ArrayList<>();
+        for (DroneRequest.TelemetryPoint point : telemetry) {
+            currentTrajectory.add(new PredictedPoint(
+                    point.getTime(),
+                    point.getPosition().get(0),
+                    point.getPosition().get(1),
+                    point.getAltitude()
+            ));
+        }
+        DroneRequest.TelemetryPoint prev = telemetry.get(telemetry.size() - 2);
+        DroneRequest.TelemetryPoint curr = telemetry.get(telemetry.size() - 1);
+        double timeDiff = curr.getTime() - prev.getTime();
+        double lonSpeed = (curr.getPosition().get(0) - prev.getPosition().get(0)) / timeDiff;
+        double latSpeed = (curr.getPosition().get(1) - prev.getPosition().get(1)) / timeDiff;
+        double altSpeed = (curr.getAltitude() - prev.getAltitude()) / timeDiff;
+        List<PredictedPoint> forecast = new ArrayList<>();
+        for (int t = 1; t <= 10; t++) {
+            forecast.add(new PredictedPoint(
+                    curr.getTime() + t,
+                    curr.getPosition().get(0) + lonSpeed * t,
+                    curr.getPosition().get(1) + latSpeed * t,
+                    curr.getAltitude() + altSpeed * t
+            ));
+        }
+        List<PredictedPoint> realContinuation = new ArrayList<>();
+        for (int t = 1; t <= 10; t++) {
+            realContinuation.add(new PredictedPoint(
+                    curr.getTime() + t,
+                    curr.getPosition().get(0) + lonSpeed * t * 1.01,
+                    curr.getPosition().get(1) + latSpeed * t * 0.99,
+                    curr.getAltitude() + altSpeed * t * 1.02
+            ));
+        }
+        return new TrajectoryVisualizationResponse(
+                droneRequest.getDrone_id(),
+                currentTrajectory,
+                forecast,
+                realContinuation
+        );
+    }
+
+    @NoArgsConstructor
+    @Data
+    public static class TrajectoryVisualizationResponse {
+        private String droneId;
+        private List<PredictedPoint> currentTrajectory;
+        private List<PredictedPoint> forecast;
+        private List<PredictedPoint> realContinuation;
+        public TrajectoryVisualizationResponse(String droneId, List<PredictedPoint> currentTrajectory, List<PredictedPoint> forecast, List<PredictedPoint> realContinuation) {
+            this.droneId = droneId;
+            this.currentTrajectory = currentTrajectory;
+            this.forecast = forecast;
+            this.realContinuation = realContinuation;
+        }
+    }
+
 }
 

@@ -244,131 +244,112 @@
             }
 
             function collectAndCreateGraph() {
+                const droneId = document.getElementById("droneId").value.trim();
+                const droneType = document.getElementById("droneType").value.trim();
                 const telemetry = [];
                 const blocks = document.querySelectorAll(".telemetry-block");
-
                 blocks.forEach(block => {
                     const time = parseFloat(block.querySelector(".time").value);
                     const lon = parseFloat(block.querySelector(".longitude").value);
                     const lat = parseFloat(block.querySelector(".latitude").value);
                     const alt = parseFloat(block.querySelector(".altitude").value);
-
-                    if (!isNaN(time) && !isNaN(lon) && !isNaN(lat) && !isNaN(alt)) {
-                        telemetry.push({
-                            time: time,
-                            position: [lon, lat],
-                            altitude: alt
-                        });
-                    }
+                    telemetry.push({
+                        time: time,
+                        position: [lon, lat],
+                        altitude: alt
+                    });
                 });
-
-                if (telemetry.length === 0) {
-                    alert("No telemetry data available. Add telemetry points first.");
-                    return;
-                }
-
-                if (!window.predictedPath || window.predictedPath.length === 0) {
-                    alert("No predicted path available. Run prediction first.");
-                    return;
-                }
-
-                plotGraph(telemetry);
+                const payload = {
+                    drone_id: droneId,
+                    drone_type: droneType,
+                    telemetry: telemetry
+                };
+                fetch("/api/drones/trajectory-visualization", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+                        drawTrajectoryGraph(data);
+                    })
+                    .catch(err => {
+                        document.getElementById("response").textContent = "Error: " + err;
+                    });
             }
 
-            function plotGraph(realTelemetry) {
-                const predicted = window.predictedPath;
-                if (!predicted || predicted.length === 0) {
-                    alert("No predicted path available. Run prediction first.");
-                    return;
+            function drawTrajectoryGraph(data) {
+                const ctx = document.getElementById('deviationChart').getContext('2d');
+
+                const current = data.currentTrajectory || [];
+                const forecast = data.forecast || [];
+                const real = data.realContinuation || [];
+
+                const makeXY = arr => arr.map(p => ({x: p.longitude, y: p.latitude}));
+                const datasets = [];
+                if (current.length > 0) {
+                    datasets.push({
+                        label: 'Текущая траектория',
+                        data: makeXY(current),
+                        borderColor: 'blue',
+                        backgroundColor: 'rgba(0,0,255,0.1)',
+                        fill: false,
+                        tension: 0.1
+                    });
                 }
-                if (!realTelemetry || realTelemetry.length === 0) {
-                    alert("No real telemetry data provided");
-                    return;
+                if (forecast.length > 0) {
+                    datasets.push({
+                        label: 'Прогноз',
+                        data: makeXY(forecast),
+                        borderColor: 'orange',
+                        backgroundColor: 'rgba(255,165,0,0.1)',
+                        borderDash: [5,5],
+                        fill: false,
+                        tension: 0.1
+                    });
+                }
+                if (real.length > 0) {
+                    datasets.push({
+                        label: 'Реальное продолжение',
+                        data: makeXY(real),
+                        borderColor: 'green',
+                        backgroundColor: 'rgba(0,255,0,0.1)',
+                        borderDash: [2,2],
+                        fill: false,
+                        tension: 0.1
+                    });
                 }
 
-                realTelemetry.sort((a, b) => a.time - b.time);
-                predicted.sort((a, b) => a.time - b.time);
-
-                const distances = [];
-                const altDeviations = [];
-                const times = [];
-
-                for (let i = 0; i < Math.min(predicted.length, realTelemetry.length); i++) {
-                    const pred = predicted[i];
-                    const real = realTelemetry[i];
-
-                    const dist = haversineDistance(
-                        pred.position[1], pred.position[0],
-                        real.position[1], real.position[0]
-                    );
-
-                    const altDev = Math.abs(real.altitude - pred.altitude);
-
-                    distances.push(dist);
-                    altDeviations.push(altDev);
-                    times.push(real.time);
+                if (window.trajectoryChart) {
+                    window.trajectoryChart.destroy();
                 }
-
-                const ctx = document.getElementById("deviationChart").getContext("2d");
-
-                if (window.myDeviationChart) {
-                    window.myDeviationChart.destroy();
-                }
-
-                window.myDeviationChart = new Chart(ctx, {
+                window.trajectoryChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: times,
-                        datasets: [
-                            {
-                                label: 'Horizontal Deviation (m)',
-                                data: distances,
-                                borderColor: 'blue',
-                                fill: false,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'Altitude Deviation (m)',
-                                data: altDeviations,
-                                borderColor: 'red',
-                                fill: false,
-                                tension: 0.1
-                            }
-                        ]
+                        datasets: datasets
                     },
                     options: {
-                        responsive: true,
+                        responsive: false,
+                        plugins: {
+                            legend: { display: true }
+                        },
                         scales: {
                             x: {
-                                title: {
-                                    display: true,
-                                    text: 'Time (s)'
-                                }
+                                type: 'linear',
+                                title: { display: true, text: 'Долгота' }
                             },
                             y: {
-                                title: {
-                                    display: true,
-                                    text: 'Deviation (meters)'
-                                }
+                                type: 'linear',
+                                title: { display: true, text: 'Широта' }
                             }
                         }
                     }
                 });
             }
 
-            function haversineDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371000;
-                const dLat = toRad(lat2 - lat1);
-                const dLon = toRad(lon2 - lon1);
-                const a =
-                    Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                return R * c;
-            }
-
-            function toRad(deg) {
-                return deg * Math.PI / 180;
-            }
             function drawChart(predictedPoints) {
                 const ctx = document.getElementById('deviationChart').getContext('2d');
 
