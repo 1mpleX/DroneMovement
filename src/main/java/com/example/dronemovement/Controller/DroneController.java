@@ -146,6 +146,11 @@ public class DroneController {
     @PostMapping("/trajectory-visualization")
     public TrajectoryVisualizationResponse getTrajectoryVisualization(@RequestBody DroneRequest droneRequest) {
         List<DroneRequest.TelemetryPoint> telemetry = droneRequest.getTelemetry();
+        String method = null;
+        int pointsLimit = droneRequest.getPoints_limit() != null ? droneRequest.getPoints_limit() : 0;
+        if (pointsLimit > 1 && telemetry != null) {
+            telemetry = telemetry.subList(0, Math.min(pointsLimit, telemetry.size()));
+        }
         if (telemetry == null || telemetry.size() < 2) {
             return new TrajectoryVisualizationResponse(
                     droneRequest.getDrone_id(),
@@ -216,6 +221,9 @@ public class DroneController {
             this.realContinuation = realContinuation;
         }
     }
+    //TODO_возможность_редактирования_отклонения
+    //TODO_новые_координаты_график
+    
 
 }
 

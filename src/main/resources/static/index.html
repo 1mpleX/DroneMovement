@@ -106,6 +106,20 @@
 
         <button onclick="addTelemetryPoint()">Add Telemetry Point</button>
         <button onclick="detectDroneType()">Detect Drone Type</button>
+        <br><br>
+        <label>Загрузить JSON файл с телеметрией:</label>
+        <input type="file" id="jsonFileInput" accept="application/json"/>
+        <button onclick="loadJsonFile()">Загрузить</button>
+        <br><br>
+        <label>Способ построения графика:</label>
+        <select id="graphMethod">
+            <option value="approximation">Аппроксимация</option>
+            <option value="interpolation">Интерполяция</option>
+        </select>
+        <br><br>
+        <label>Количество точек для построения графика:</label>
+        <input type="number" id="pointsLimit" min="2" max="1000" value="10"/>
+        <br><br>
         <button onclick="collectAndCreateGraph()">Create Graph and Predict Path</button>
 
         <h2>Server Response</h2>
@@ -246,6 +260,52 @@
                     });
             }
 
+            function loadJsonFile() {
+                const input = document.getElementById('jsonFileInput');
+                if (!input.files || input.files.length === 0) {
+                    alert('Выберите JSON файл.');
+                    return;
+                }
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.telemetry && Array.isArray(data.telemetry)) {
+                            fillTelemetryBlocks(data.telemetry);
+                            if (data.drone_id) document.getElementById('droneId').value = data.drone_id;
+                            if (data.drone_type) document.getElementById('droneType').value = data.drone_type;
+                        } else {
+                            alert('Некорректный формат файла: нет telemetry.');
+                        }
+                    } catch (err) {
+                        alert('Ошибка чтения файла: ' + err);
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            function fillTelemetryBlocks(telemetry) {
+                const container = document.getElementById('telemetry-container');
+                container.innerHTML = '';
+                telemetry.forEach(point => {
+                    const div = document.createElement('div');
+                    div.className = 'telemetry-block';
+                    div.innerHTML = `
+                        <label>Time (seconds):</label>
+                        <input type="number" step="0.01" class="time" value="${point.time}"/>
+                        <label>Longitude:</label>
+                        <input type="number" step="0.000001" class="longitude" value="${point.position[0]}"/>
+                        <label>Latitude:</label>
+                        <input type="number" step="0.000001" class="latitude" value="${point.position[1]}"/>
+                        <label>Altitude:</label>
+                        <input type="number" step="0.01" class="altitude" value="${point.altitude}"/>
+                        <button onclick="this.parentNode.remove()">🗑 Remove</button>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+
             function collectAndCreateGraph() {
                 const droneId = document.getElementById("droneId").value.trim();
                 const droneType = document.getElementById("droneType").value.trim();
@@ -262,10 +322,14 @@
                         altitude: alt
                     });
                 });
+                const method = document.getElementById('graphMethod').value;
+                const pointsLimit = parseInt(document.getElementById('pointsLimit').value, 10);
                 const payload = {
                     drone_id: droneId,
                     drone_type: droneType,
-                    telemetry: telemetry
+                    telemetry: telemetry,
+                    method: method,
+                    points_limit: pointsLimit
                 };
                 fetch("/api/drones/trajectory-visualization", {
                     method: "POST",

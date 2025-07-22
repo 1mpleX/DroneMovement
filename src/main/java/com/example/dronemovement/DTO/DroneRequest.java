@@ -13,6 +13,10 @@ public class DroneRequest {
     private String type;
     private List<TelemetryPoint> telemetry;
 
+    private String method;
+    @JsonProperty("points_limit")
+    private Integer points_limit;
+
     @Data
     public static class TelemetryPoint {
         private int time;
