@@ -78,11 +78,45 @@
             border-radius: 6px;
             white-space: pre-wrap;
             margin-top: 20px;
+            max-height: 250px;
+            overflow-y: auto;
         }
 
         .container {
             max-width: 800px;
             margin: 0 auto;
+        }
+        .styled-select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #fff;
+            font-size: 16px;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background: #fff url('data:image/svg+xml;utf8,<svg fill="%233498db" height="20" viewBox="0 0 20 20" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M7.293 8.293a1 1 0 011.414 0L10 9.586l1.293-1.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z"/></svg>') no-repeat right 12px center/20px 20px;
+            padding-right: 40px;
+        }
+        .styled-select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        .styled-input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .styled-input:focus {
+            border-color: #3498db;
+            outline: none;
         }
     </style>
 
@@ -98,7 +132,7 @@
         <input type="text" id="droneId" value="drone_01"/>
 
         <label>Drone Type:</label>
-        <input type="text" id="droneType" value="quadrotor"/>
+        <input type="text" id="droneType" value="quadcopter"/>
 
         <h2>Telemetry Data</h2>
 
@@ -112,15 +146,16 @@
         <button onclick="loadJsonFile()">Загрузить</button>
         <br><br>
         <label>Способ построения графика:</label>
-        <select id="graphMethod">
+        <select id="graphMethod" class="styled-select">
             <option value="approximation">Аппроксимация</option>
             <option value="interpolation">Интерполяция</option>
         </select>
         <br><br>
         <label>Количество точек для построения графика:</label>
-        <input type="number" id="pointsLimit" min="2" max="1000" value="10"/>
+        <input type="number" id="pointsLimit" min="2" max="1000" value="10" class="styled-input"/>
         <br><br>
         <button onclick="collectAndCreateGraph()">Create Graph and Predict Path</button>
+        <button onclick="stopCalculation()" id="stopBtn">Остановить расчет</button>
 
         <h2>Server Response</h2>
         <pre id="response">Waiting...</pre>
@@ -136,6 +171,11 @@
         <script>
 
             window.predictedPath = [];
+            window.allTelemetry = [];
+            window.baseTelemetry = [];
+            window.generatedTelemetry = [];
+            window.replayInterval = null;
+            window.responseHistory = [];
 
             function addTelemetryPoint() {
                 const container = document.getElementById("telemetry-container");
@@ -307,45 +347,94 @@
             }
 
             function collectAndCreateGraph() {
-                const droneId = document.getElementById("droneId").value.trim();
-                const droneType = document.getElementById("droneType").value.trim();
-                const telemetry = [];
+
+                if (window.replayInterval) {
+                    clearInterval(window.replayInterval);
+                    window.replayInterval = null;
+                }
+                document.getElementById("response").textContent = "Waiting...";
+
                 const blocks = document.querySelectorAll(".telemetry-block");
+                window.allTelemetry = [];
                 blocks.forEach(block => {
                     const time = parseFloat(block.querySelector(".time").value);
                     const lon = parseFloat(block.querySelector(".longitude").value);
                     const lat = parseFloat(block.querySelector(".latitude").value);
                     const alt = parseFloat(block.querySelector(".altitude").value);
-                    telemetry.push({
+                    window.allTelemetry.push({
                         time: time,
                         position: [lon, lat],
                         altitude: alt
                     });
                 });
+                const droneId = document.getElementById("droneId").value.trim();
+                const droneType = document.getElementById("droneType").value.trim();
                 const method = document.getElementById('graphMethod').value;
                 const pointsLimit = parseInt(document.getElementById('pointsLimit').value, 10);
-                const payload = {
-                    drone_id: droneId,
-                    drone_type: droneType,
-                    telemetry: telemetry,
-                    method: method,
-                    points_limit: pointsLimit
-                };
-                fetch("/api/drones/trajectory-visualization", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(payload)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
-                        drawTrajectoryGraph(data);
+
+                window.baseTelemetry = window.allTelemetry.slice(0, pointsLimit);
+                window.generatedTelemetry = [...window.baseTelemetry];
+
+                function sendAndUpdate() {
+                    const payload = {
+                        drone_id: droneId,
+                        drone_type: droneType,
+                        telemetry: window.generatedTelemetry,
+                        method: method,
+                        points_limit: window.generatedTelemetry.length
+                    };
+                    fetch("/api/drones/trajectory-visualization", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
                     })
-                    .catch(err => {
-                        document.getElementById("response").textContent = "Error: " + err;
-                    });
+                        .then(response => response.json())
+                        .then(data => {
+                            document.getElementById("response").textContent =
+                              "Telemetry (" + window.generatedTelemetry.length + "):\n" +
+                              JSON.stringify(window.generatedTelemetry, null, 2) +
+                              "\n\nServer response:\n" +
+                              JSON.stringify(data, null, 2);
+                            drawTrajectoryGraph(data);
+                        })
+                        .catch(err => {
+                            document.getElementById("response").textContent = "Error: " + err;
+                        });
+                }
+
+                sendAndUpdate();
+
+                window.replayInterval = setInterval(() => {
+                    if (window.generatedTelemetry.length >= 30) {
+                        clearInterval(window.replayInterval);
+                        window.replayInterval = null;
+                        return;
+                    }
+
+                    if (window.generatedTelemetry.length >= 2) {
+                        const prev = window.generatedTelemetry[window.generatedTelemetry.length - 2];
+                        const curr = window.generatedTelemetry[window.generatedTelemetry.length - 1];
+                        const timeDiff = curr.time - prev.time;
+                        let newTime = curr.time + (timeDiff > 0 ? timeDiff : 1);
+                        const lonSpeed = (curr.position[0] - prev.position[0]) / (timeDiff > 0 ? timeDiff : 1);
+                        const latSpeed = (curr.position[1] - prev.position[1]) / (timeDiff > 0 ? timeDiff : 1);
+                        const altSpeed = (curr.altitude - prev.altitude) / (timeDiff > 0 ? timeDiff : 1);
+                        const newPoint = {
+                            time: newTime,
+                            position: [curr.position[0] + lonSpeed * (timeDiff > 0 ? timeDiff : 1), curr.position[1] + latSpeed * (timeDiff > 0 ? timeDiff : 1)],
+                            altitude: curr.altitude + altSpeed * (timeDiff > 0 ? timeDiff : 1)
+                        };
+                        window.generatedTelemetry.push(newPoint);
+                    }
+                    sendAndUpdate();
+                }, 1000);
+            }
+
+            function stopCalculation() {
+                if (window.replayInterval) {
+                    clearInterval(window.replayInterval);
+                    window.replayInterval = null;
+                }
             }
 
             function drawTrajectoryGraph(data) {

@@ -221,9 +221,4 @@ public class DroneController {
             this.realContinuation = realContinuation;
         }
     }
-    //TODO_возможность_редактирования_отклонения
-    //TODO_новые_координаты_график
-    
-
 }
-
