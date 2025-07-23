@@ -4,9 +4,9 @@
   "telemetry": [
     { "time": 0, "position": [37.617635, 55.755814], "altitude": 100 },
     { "time": 1, "position": [37.617640, 55.755820], "altitude": 101 },
-    { "time": 2, "position": [37.617650, 55.755830], "altitude": 102 },
+    { "time": 2, "position": [37.617650, 55.756200], "altitude": 102 },
     { "time": 3, "position": [37.617670, 55.755850], "altitude": 103 },
-    { "time": 4, "position": [37.617700, 55.755880], "altitude": 104 },
+    { "time": 4, "position": [37.617700, 55.755600], "altitude": 104 }, 
     { "time": 5, "position": [37.617740, 55.755920], "altitude": 105 }
   ]
 }

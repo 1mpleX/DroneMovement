@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
+import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
+import org.apache.commons.math3.fitting.PolynomialCurveFitter;
+import org.apache.commons.math3.fitting.WeightedObservedPoints;
 
 @RestController
 @RequestMapping("/api/drones")
@@ -146,7 +150,7 @@ public class DroneController {
     @PostMapping("/trajectory-visualization")
     public TrajectoryVisualizationResponse getTrajectoryVisualization(@RequestBody DroneRequest droneRequest) {
         List<DroneRequest.TelemetryPoint> telemetry = droneRequest.getTelemetry();
-        String method = null;
+        String method = droneRequest.getMethod();
         int pointsLimit = droneRequest.getPoints_limit() != null ? droneRequest.getPoints_limit() : 0;
         if (pointsLimit > 1 && telemetry != null) {
             telemetry = telemetry.subList(0, Math.min(pointsLimit, telemetry.size()));
@@ -187,17 +191,71 @@ public class DroneController {
         }
 
         List<PredictedPoint> realContinuation = new ArrayList<>();
-        Random rand = new Random();
-        for (int t = 1; t <= 15; t++) {
-            double noiseLon = (rand.nextDouble() - 0.5) * 0.0005;
-            double noiseLat = (rand.nextDouble() - 0.5) * 0.0005;
-            double noiseAlt = (rand.nextDouble() - 0.5) * 2.0;
-            realContinuation.add(new PredictedPoint(
-                    curr.getTime() + t,
-                    curr.getPosition().get(0) + lonSpeed * t * 1.01 + noiseLon,
-                    curr.getPosition().get(1) + latSpeed * t * 0.99 + noiseLat,
-                    curr.getAltitude() + altSpeed * t * 1.02 + noiseAlt
-            ));
+        if ("interpolation".equalsIgnoreCase(method) && telemetry.size() >= 4) {
+
+            double[] x = new double[telemetry.size()];
+            double[] y = new double[telemetry.size()];
+            double[] alt = new double[telemetry.size()];
+            double[] t = new double[telemetry.size()];
+            for (int i = 0; i < telemetry.size(); i++) {
+                x[i] = telemetry.get(i).getPosition().get(0);
+                y[i] = telemetry.get(i).getPosition().get(1);
+                alt[i] = telemetry.get(i).getAltitude();
+                t[i] = i + 1;
+            }
+            SplineInterpolator interpolator = new SplineInterpolator();
+            PolynomialSplineFunction splineY = interpolator.interpolate(x, y);
+            PolynomialSplineFunction splineAlt = interpolator.interpolate(x, alt);
+            double minX = x[0], maxX = x[x.length - 1];
+            int N = 20;
+            for (int i = 0; i < N; i++) {
+                double xi = minX + (maxX - minX) * i / (N - 1);
+                realContinuation.add(new PredictedPoint(
+                    i + 1,
+                    xi,
+                    splineY.value(xi),
+                    splineAlt.value(xi)
+                ));
+            }
+        } else if ("approximation".equalsIgnoreCase(method) && telemetry.size() >= 4) {
+
+            WeightedObservedPoints obsY = new WeightedObservedPoints();
+            WeightedObservedPoints obsAlt = new WeightedObservedPoints();
+            for (int i = 0; i < telemetry.size(); i++) {
+                double x = telemetry.get(i).getPosition().get(0);
+                double y = telemetry.get(i).getPosition().get(1);
+                double alt = telemetry.get(i).getAltitude();
+                obsY.add(x, y);
+                obsAlt.add(x, alt);
+            }
+            PolynomialCurveFitter fitter = PolynomialCurveFitter.create(3);
+            double[] coeffY = fitter.fit(obsY.toList());
+            double[] coeffAlt = fitter.fit(obsAlt.toList());
+            double minX = telemetry.get(0).getPosition().get(0);
+            double maxX = telemetry.get(telemetry.size() - 1).getPosition().get(0);
+            int N = 20;
+            for (int i = 0; i < N; i++) {
+                double xi = minX + (maxX - minX) * i / (N - 1);
+                double yi = coeffY[0] + coeffY[1]*xi + coeffY[2]*xi*xi + coeffY[3]*xi*xi*xi;
+                double alti = coeffAlt[0] + coeffAlt[1]*xi + coeffAlt[2]*xi*xi + coeffAlt[3]*xi*xi*xi;
+                realContinuation.add(new PredictedPoint(
+                    i + 1,
+                    xi,
+                    yi,
+                    alti
+                ));
+            }
+        } else if (telemetry.size() >= 2) {
+
+            for (int i = 0; i < telemetry.size(); i++) {
+                var point = telemetry.get(i);
+                realContinuation.add(new PredictedPoint(
+                        i + 1,
+                        point.getPosition().get(0),
+                        point.getPosition().get(1),
+                        point.getAltitude()
+                ));
+            }
         }
         return new TrajectoryVisualizationResponse(
                 droneRequest.getDrone_id(),
