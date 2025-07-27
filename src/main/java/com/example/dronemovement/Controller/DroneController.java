@@ -254,6 +254,7 @@ public class DroneController {
                         point.getPosition().get(0),
                         point.getPosition().get(1),
                         point.getAltitude()
+
                 ));
             }
         }
