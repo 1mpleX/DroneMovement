@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 import org.apache.commons.math3.fitting.PolynomialCurveFitter;
@@ -254,6 +254,7 @@ public class DroneController {
                         point.getPosition().get(0),
                         point.getPosition().get(1),
                         point.getAltitude()
+
                 ));
             }
         }
