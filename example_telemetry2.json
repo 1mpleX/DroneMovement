@@ -1,0 +1,27 @@
+{
+  "drone_id": "drone_01",
+  "drone_type": "quadrotor",
+  "telemetry": [
+    { "time": 0, "position": [37.617635, 55.755814], "altitude": 100 },
+    { "time": 0.5, "position": [37.617638, 55.755810], "altitude": 101 },
+    { "time": 1.0, "position": [37.617642, 55.755805], "altitude": 103 },
+    { "time": 1.5, "position": [37.617647, 55.755798], "altitude": 106 },
+    { "time": 2.0, "position": [37.617653, 55.755790], "altitude": 110 },
+    { "time": 2.5, "position": [37.617660, 55.755780], "altitude": 115 },
+    { "time": 3.0, "position": [37.617668, 55.755770], "altitude": 120 },
+    { "time": 3.5, "position": [37.617677, 55.755760], "altitude": 125 },
+    { "time": 4.0, "position": [37.617687, 55.755750], "altitude": 130 },
+    { "time": 4.5, "position": [37.617698, 55.755742], "altitude": 135 },
+    { "time": 5.0, "position": [37.617710, 55.755735], "altitude": 140 },
+    { "time": 5.5, "position": [37.617723, 55.755730], "altitude": 145 },
+    { "time": 6.0, "position": [37.617737, 55.755728], "altitude": 150 },
+    { "time": 6.5, "position": [37.617752, 55.755730], "altitude": 155 },
+    { "time": 7.0, "position": [37.617768, 55.755735], "altitude": 160 },
+    { "time": 7.5, "position": [37.617785, 55.755745], "altitude": 165 },
+    { "time": 8.0, "position": [37.617803, 55.755760], "altitude": 170 },
+    { "time": 8.5, "position": [37.617822, 55.755780], "altitude": 175 },
+    { "time": 9.0, "position": [37.617842, 55.755805], "altitude": 180 },
+    { "time": 9.5, "position": [37.617863, 55.755835], "altitude": 185 },
+    { "time": 10.0, "position": [37.617885, 55.755870], "altitude": 190 }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "drone_id": "drone_01",
+  "drone_type": "quadrotor",
+  "telemetry": [
+    { "time": 0, "position": [37.617635, 55.755814], "altitude": 100 },
+    { "time": 1, "position": [37.617640, 55.755720], "altitude": 101 },
+    { "time": 2, "position": [37.617650, 55.756800], "altitude": 102 },
+    { "time": 3, "position": [37.617670, 55.755750], "altitude": 103 },
+    { "time": 4, "position": [37.617700, 55.755800], "altitude": 104 },
+    { "time": 5, "position": [37.617740, 55.755920], "altitude": 105 }
+  ]
+}
